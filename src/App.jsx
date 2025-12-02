@@ -1,6 +1,8 @@
 import './App.css';
 import './TodoList';
 import TodoList from './TodoList';
+import './TodoForm';
+import TodoForm from './TodoForm';
 
 function App() {
   const todos = [
@@ -11,7 +13,8 @@ function App() {
 
   return (
     <div>
-      <h1>My Todos</h1>
+      <h1>Todo List</h1>
+      <TodoForm />
       <TodoList />
     </div>
   );
