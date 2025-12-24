@@ -6,14 +6,18 @@ import './TodoForm';
 import TodoForm from './TodoForm';
 
 function App() {
-  const [newTodo, setNewTodo] = useState('initial value');
+  const [todoList, setTodoList] = useState([]);
+
+  function addTodo(title) {
+    const newTodo = { title: title, id: Date.now() };
+    setTodoList([...todoList, newTodo]);
+  }
 
   return (
     <div>
       <h1>Todo List</h1>
-      <TodoForm />
-      <p>{newTodo}</p>
-      <TodoList />
+      <TodoForm onAddTodo={addTodo} />
+      <TodoList todoList={todoList} />
     </div>
   );
 }
