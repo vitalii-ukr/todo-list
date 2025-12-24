@@ -9,7 +9,7 @@ function TodoForm({ onAddTodo }) {
     todoTitleInput.current.focus();
   }
 
-  const todoTitleInput = useRef('');
+  const todoTitleInput = useRef(null);
 
   return (
     <form onSubmit={handleAddTodo}>
