@@ -29,6 +29,8 @@ function TodoListItem({ todo, onCompleteTodo, onUpdateTodo }) {
           <>
             <TextInputWithLabel
               value={workingTitle}
+              elementId={`editTodo${todo.id}`}
+              labelText="Edit TODO"
               onChange={(event) => handleEdit(event)}
             />
             <input
