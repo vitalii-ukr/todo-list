@@ -9,6 +9,14 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  function getTokenHeader() {
+    return `Bearer ${import.meta.env.VITE_PAT}`;
+  }
+
+  function getDbUrl() {
+    return `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
+  }
+
   function completedTodo(id) {
     const updatedTodos = todoList.map((todo) => {
       if (todo.id === id) {
@@ -31,16 +39,58 @@ function App() {
     setTodoList(updatedTodos);
   }
 
-  function addTodo(title) {
-    const newTodo = { title: title, id: Date.now(), isCompleted: false };
-    setTodoList([...todoList, newTodo]);
-  }
+  const addTodo = async (newTodo) => {
+    const payload = {
+      records: [
+        {
+          fields: {
+            title: newTodo.title,
+            isCompleted: newTodo.isCompleted,
+          },
+        },
+      ],
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        Authorization: getTokenHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    };
+
+    try {
+      setIsSaving(true);
+      const resp = await fetch(getDbUrl(), options);
+      if (!resp.ok) {
+        throw new Error(resp.status);
+      }
+
+      const { records } = await resp.json();
+      const savedTodo = records.map((r) => {
+        return {
+          id: r.id,
+          ...r.fields,
+        };
+      });
+      if (!savedTodo.isCompleted) {
+        savedTodo.isCompleted = false;
+      }
+
+      setTodoList([savedTodo, ...todoList]);
+    } catch (error) {
+      console.log(error.message);
+      setErrorMessage(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const fetchTodos = async () => {
       setIsLoading(true);
-      const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
-      const token = `Bearer ${import.meta.env.VITE_PAT}`;
+      const url = getDbUrl();
+      const token = getTokenHeader();
       const options = {
         method: 'GET',
         headers: {
