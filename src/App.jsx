@@ -79,7 +79,7 @@ function App() {
   const addTodo = async (newTodo) => {
     try {
       setIsSaving(true);
-      const resp = createNewTodo(newTodo);
+      const resp = await createNewTodo(newTodo);
       if (!resp.ok) {
         throw new Error(resp.status);
       }
