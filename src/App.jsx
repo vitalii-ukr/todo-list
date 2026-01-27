@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import TodoList from './features/TodoList/TodoList';
 import TodoForm from './features/TodoForm';
+import TodoList from './features/TodoList/TodoList';
 
 function App() {
   const [todoList, setTodoList] = useState([]);
@@ -9,22 +9,44 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  function getTokenHeader() {
-    return `Bearer ${import.meta.env.VITE_PAT}`;
-  }
-
-  function getDbUrl() {
-    return `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
-  }
-
   async function completedTodo(id) {
     var editedTodo = todoList.find((t) => t.id == id);
     editedTodo.isCompleted = true;
     await updateTodo(editedTodo);
   }
 
-  const updateTodo = async (editedTodo) => {
-    const originalTodo = todoList.find((todo) => todo.id === editedTodo.id);
+  async function dbApiRequest(options) {
+    const dbUrl = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
+    if (!options.hasOwnProperty('headers')) {
+      options.headers = {};
+    }
+    options.headers['Authorization'] = `Bearer ${import.meta.env.VITE_PAT}`;
+    return await fetch(dbUrl, options);
+  }
+
+  async function createNewTodo(newTodo) {
+    const payload = {
+      records: [
+        {
+          fields: {
+            title: newTodo.title,
+            isCompleted: newTodo.isCompleted,
+          },
+        },
+      ],
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    };
+
+    return await dbApiRequest(options);
+  }
+
+  async function updateExistTodo(editedTodo) {
     const payload = {
       records: [
         {
@@ -40,15 +62,58 @@ function App() {
     const options = {
       method: 'PATCH',
       headers: {
-        Authorization: getTokenHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     };
+    return await dbApiRequest(options);
+  }
+
+  async function selectAllTodos() {
+    const options = {
+      method: 'GET',
+    };
+    return await dbApiRequest(options);
+  }
+
+  const addTodo = async (newTodo) => {
+    try {
+      setIsSaving(true);
+      const resp = createNewTodo(newTodo);
+      if (!resp.ok) {
+        throw new Error(resp.status);
+      }
+
+      const { records } = await resp.json();
+      const savedTodos = records.map((r) => {
+        return {
+          id: r.id,
+          ...r.fields,
+        };
+      });
+      if (savedTodos.length > 1) {
+        throw new Error('DB return more than one saved entities!');
+      }
+      const savedTodo = savedTodos[0];
+      if (!savedTodo.isCompleted) {
+        savedTodo.isCompleted = false;
+      }
+
+      setTodoList([savedTodo, ...todoList]);
+    } catch (error) {
+      console.log(error.message);
+      setErrorMessage(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateTodo = async (editedTodo) => {
+    const originalTodo = todoList.find((todo) => todo.id === editedTodo.id);
 
     try {
       setIsSaving(true);
-      const resp = await fetch(getDbUrl(), options);
+      const resp = await updateExistTodo(editedTodo);
       if (!resp.ok) {
         throw new Error(resp.status);
       }
@@ -84,76 +149,12 @@ function App() {
     }
   };
 
-  const addTodo = async (newTodo) => {
-    const payload = {
-      records: [
-        {
-          fields: {
-            title: newTodo.title,
-            isCompleted: newTodo.isCompleted,
-          },
-        },
-      ],
-    };
-    const options = {
-      method: 'POST',
-      headers: {
-        Authorization: getTokenHeader(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    };
-
-    try {
-      setIsSaving(true);
-      const resp = await fetch(getDbUrl(), options);
-      if (!resp.ok) {
-        throw new Error(resp.status);
-      }
-
-      const { records } = await resp.json();
-      const savedTodos = records.map((r) => {
-        return {
-          id: r.id,
-          ...r.fields,
-        };
-      });
-
-      if (savedTodos.length > 1) {
-        throw new Error('DB return more than one saved entities!');
-      }
-      if (savedTodos.length < 1) {
-        throw new Error('There are no saved records in DB!');
-      }
-
-      const savedTodo = savedTodos[0];
-      if (!savedTodo.isCompleted) {
-        savedTodo.isCompleted = false;
-      }
-
-      setTodoList([savedTodo, ...todoList]);
-    } catch (error) {
-      console.log(error.message);
-      setErrorMessage(error.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   useEffect(() => {
     const fetchTodos = async () => {
       setIsLoading(true);
-      const url = getDbUrl();
-      const token = getTokenHeader();
-      const options = {
-        method: 'GET',
-        headers: {
-          Authorization: token,
-        },
-      };
 
       try {
-        const resp = await fetch(url, options);
+        const resp = await selectAllTodos();
         if (!resp.ok) {
           throw new Error(resp.status);
         }
@@ -183,7 +184,7 @@ function App() {
 
   return (
     <div>
-      <h1>Todo List</h1>
+      <h1>My Todos</h1>
       <TodoForm onAddTodo={addTodo} isSaving={isSaving} />
       {isLoading ? (
         <p>Todo list loading...</p>
